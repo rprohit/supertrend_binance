@@ -89,19 +89,21 @@ def supertrend_st2(df , period= 7, multiplier=3):
 
 # Check in_position for symbol
 def check_in_position(df,coin_symbol, exchange):
-    coin = str(coin_symbol).split('/',1)
+    coin = str(coin_symbol).split('/', 1)
     balances = exchange.fetch_balance()
     assets = balances.get("info").get("balances")
-    last_row_index = len(df.index) - 1
+    #last_row_index = len(df.index) - 1
     for asset in assets:
         if asset.get('asset') == coin[0]:
             free = float(asset['free'])
-            print(f'Free Balacne is {free}')
-            #Fetching the latest price of coin_symbol(ETH/USDT)
+            locked = float(asset['locked'])
+            print(f'Free Balacne is {free} and locked is {locked}')
+            # Fetching the latest price of coin_symbol(ETH/USDT)
             price = float(exchange.fetchTicker(coin_symbol).get('last'))
-            current_position_size = price *free
+            current_position_size = price * (free + locked)
             if current_position_size > 10:
-                print(f'You are already in position for {coin_symbol} , free balance {free} and estimated position size {current_position_size}')
+                print(
+                    f'You are already in position for {coin_symbol} , free balance {free} and estimated position size {current_position_size}')
                 return True
     return False
 
