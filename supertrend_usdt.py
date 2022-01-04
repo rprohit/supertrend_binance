@@ -41,9 +41,10 @@ def trade_crypto():
     print(f'==========================Started At==================== {datetime.now().isoformat()}==============')
     for trade in config.trades:
         run_bot(trade)
+        time.sleep(1)
     print(f'==========================Ended At==================== {datetime.now().isoformat()}==============')
 
-schedule.every(20).seconds.do(trade_crypto)
+schedule.every(150).seconds.do(trade_crypto)
 
 
 while True:

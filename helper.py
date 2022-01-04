@@ -2,13 +2,16 @@ import ccxt
 import config
 
 #API to initialize the exchange
+exchange = None
 def get_exchange():
     # defining the exchange from where we want the data , we are connecting to binance
     # Note : We are not in binanceus
-    exchange = ccxt.binance({
-        'apiKey': config.API_KEY,
-        'secret': config.API_SECRET
-    })
+    global exchange
+    if exchange is None:
+        exchange = ccxt.binance({
+            'apiKey': config.API_KEY,
+            'secret': config.API_SECRET
+        })
     # print(f'Balance {exchange.fetch_balance()}')
     return exchange
 
@@ -30,31 +33,58 @@ def atr(df,period=14):
     return the_atr
     #df['atr'] = the_atr
 
-#Calculating the supertrend
-def supertrend(df , period= 7, multiplier=3):
+#Calculating the supertrend 1
+def supertrend_st1(df , period= 7, multiplier=3):
     hl2=(df['high']+df['low'])/2
-    df['atr'] = atr(df,period)
-    df['upperband'] = hl2 + (multiplier * df['atr'])
-    df['lowerband'] = hl2 - (multiplier * df['atr'])
-    df['in_uptrend'] = True
+    df['atr_st1'] = atr(df,period)
+    df['upperband_st1'] = hl2 + (multiplier * df['atr_st1'])
+    df['lowerband_st1'] = hl2 - (multiplier * df['atr_st1'])
+    df['in_uptrend_st1'] = True
 
     for current in range(1,len(df.index)):
         #here current is my running index and previous is my previos index ,
         # here i will be comparing my current data with previous data
         previous = current -1
 
-        if df['close'][current] > df['upperband'][previous]:
-            df['in_uptrend'][current]= True
-        elif df['close'][current] < df['lowerband'][previous]:
-            df['in_uptrend'][current] = False
+        if df['close'][current] > df['upperband_st1'][previous]:
+            df['in_uptrend_st1'][current]= True
+        elif df['close'][current] < df['lowerband_st1'][previous]:
+            df['in_uptrend_st1'][current] = False
         else:
-            df['in_uptrend'][current] = df['in_uptrend'][previous]
+            df['in_uptrend_st1'][current] = df['in_uptrend_st1'][previous]
 
-            if df['in_uptrend'][current] and df['lowerband'][current] < df['lowerband'][previous]:
-                df['lowerband'][current] = df['lowerband'][previous]
+            if df['in_uptrend_st1'][current] and df['lowerband_st1'][current] < df['lowerband_st1'][previous]:
+                df['lowerband_st1'][current] = df['lowerband_st1'][previous]
 
-            if not df['in_uptrend'][current] and df['upperband'][current] > df['upperband'][previous]:
-                df['upperband'][current] = df['upperband'][previous]
+            if not df['in_uptrend_st1'][current] and df['upperband_st1'][current] > df['upperband_st1'][previous]:
+                df['upperband_st1'][current] = df['upperband_st1'][previous]
+    return df
+
+#Calculating the supertrend 2
+def supertrend_st2(df , period= 7, multiplier=3):
+    hl2=(df['high']+df['low'])/2
+    df['atr_st2'] = atr(df,period)
+    df['upperband_st2'] = hl2 + (multiplier * df['atr_st2'])
+    df['lowerband_st2'] = hl2 - (multiplier * df['atr_st2'])
+    df['in_uptrend_st2'] = True
+
+    for current in range(1,len(df.index)):
+        #here current is my running index and previous is my previos index ,
+        # here i will be comparing my current data with previous data
+        previous = current -1
+
+        if df['close'][current] > df['upperband_st2'][previous]:
+            df['in_uptrend_st2'][current]= True
+        elif df['close'][current] < df['lowerband_st2'][previous]:
+            df['in_uptrend_st2'][current] = False
+        else:
+            df['in_uptrend_st2'][current] = df['in_uptrend_st2'][previous]
+
+            if df['in_uptrend_st2'][current] and df['lowerband_st2'][current] < df['lowerband_st2'][previous]:
+                df['lowerband_st2'][current] = df['lowerband_st2'][previous]
+
+            if not df['in_uptrend_st2'][current] and df['upperband_st2'][current] > df['upperband_st2'][previous]:
+                df['upperband_st2'][current] = df['upperband_st2'][previous]
     return df
 
 # Check in_position for symbol
@@ -118,9 +148,14 @@ def check_and_trigger_buy_sell_orders(df,coin_symbol,exchange):
     previous_row_index = last_row_index -1
 
     decide_position_to_use = calculate_lot_size_for_trade_buy(exchange,coin_symbol)
+    #TODO - some refactoring
+    #price_usdt = float(exchange.fetchTicker('USDT/USDT').get('last'))
+    free_usdt = calculate_free_coins_for_sell('USDT/USDT',exchange)
+    #portion_balance = float(config.total_balance_for_supertrend) * (config.per_per_trade / 100)
     #For Buy Order
-    if not df['in_uptrend'][previous_row_index] and df['in_uptrend'][last_row_index]:
-        if not in_position:
+    #if not df['in_uptrend'][previous_row_index] and df['in_uptrend'][last_row_index]:
+    if df['in_uptrend_st1'][last_row_index] and df['in_uptrend_st2'][last_row_index]:
+        if not in_position and df['ema_in_uptrend'][last_row_index] and (free_usdt >60): #TODO remove hardcoding
             print(f'Change to uptrend :  Buy . Going to punch buy order for {coin_symbol} and the quantity is  {decide_position_to_use} ')
             order = exchange.create_market_buy_order(coin_symbol,decide_position_to_use)
             print(order)
@@ -128,8 +163,8 @@ def check_and_trigger_buy_sell_orders(df,coin_symbol,exchange):
         else :
             print('Already in position , nothng to do')
 
-    #For Sell order
-    if df['in_uptrend'][previous_row_index] and not df['in_uptrend'][last_row_index]:
+    #For Sell order if any of supertrend is in down trend we will sell the holdings
+    if (not df['in_uptrend_st1'][last_row_index]) or (not df['in_uptrend_st2'][last_row_index]):
         if in_position:
             print('Change to downtrend : Sell ')
             free_balance_to_Sell = calculate_free_coins_for_sell(coin_symbol,exchange)
@@ -161,3 +196,32 @@ def format_num_filter(number):
         return round(number,8)
     else:
         return round(number)
+
+#API to add SMA
+def add_sma(df,period = 14):
+    df['sma'] = df['close'].rolling(period).mean()
+    df['sma_in_uptrend'] = True
+    for current in range(1, len(df.index)):
+        previous = current - 1
+        if df['sma'][current] > df['sma'][previous]:
+            df['sma_in_uptrend'][current] = True
+        elif df['sma'][current] < df['sma'][previous]:
+            df['sma_in_uptrend'][current] = False
+        else:
+            df['sma_in_uptrend'][current] =df['sma_in_uptrend'][previous]
+    return df
+
+#API to Add EMA
+def add_ema(df,period = 14):
+    df['ema'] = df['close'].ewm(period).mean()
+    df['ema_in_uptrend'] = True
+    for current in range(1, len(df.index)):
+        previous = current - 1
+        if df['ema'][current] > df['ema'][previous]:
+            df['ema_in_uptrend'][current] = True
+        elif df['ema'][current] < df['ema'][previous]:
+            df['ema_in_uptrend'][current] = False
+        else:
+            df['ema_in_uptrend'][current] = df['ema_in_uptrend'][previous]
+    return df
+
