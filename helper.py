@@ -137,6 +137,7 @@ def calculate_free_coins_for_sell(coin_symbol,exchange):
             return free
     return free
 
+#This strategy is complete supertrend startegy - buy ansd sell will be punched based on supertrend only
 def check_and_trigger_buy_sell_orders(df,coin_symbol,exchange):
     #Calculating whether we are already in position or not
     in_position = check_in_position(df,coin_symbol,exchange)
@@ -174,9 +175,87 @@ def check_and_trigger_buy_sell_orders(df,coin_symbol,exchange):
         else:
             print('You arent in position nothing to sell')
 
+#This strategy is based on 1:2 profit and loss - We will book profit on 5% above the buying price and stop loss will be of 2%
+def check_and_trigger_buy_sell_orders_risk_reward(df,coin_symbol,exchange):
+
+    #Calculating whether we are already in position or not
+    in_position = check_in_position(df,coin_symbol,exchange)
+
+    print(f'Checking for buy and sell for {coin_symbol}')
+    print(df.tail(2))
+
+    last_row_index = len(df.index) -1
+    previous_row_index = last_row_index -1
+
+    decide_position_to_use = calculate_lot_size_for_trade_buy(exchange,coin_symbol)
+    #TODO - some refactoring
+    #price_usdt = float(exchange.fetchTicker('USDT/USDT').get('last'))
+    free_usdt = calculate_free_coins_for_sell('USDT/USDT',exchange)
+    #portion_balance = float(config.total_balance_for_supertrend) * (config.per_per_trade / 100)
+    #For Buy Order
+    #if not df['in_uptrend'][previous_row_index] and df['in_uptrend'][last_row_index]:
+    if df['in_uptrend_st1'][last_row_index] and df['in_uptrend_st2'][last_row_index] and ((not df['in_uptrend_st1'][previous_row_index] and df['in_uptrend_st1'][last_row_index]) or(not df['in_uptrend_st2'][previous_row_index] and df['in_uptrend_st2'][last_row_index])):
+        if not in_position and df['ema_in_uptrend'][last_row_index] and (free_usdt >60): #TODO remove hardcoding
+            print(f'Change to uptrend :  Buy . Going to punch buy order for {coin_symbol} and the quantity is  {decide_position_to_use} ')
+            order_buy_order = exchange.create_market_buy_order(coin_symbol,decide_position_to_use)
+            print(order_buy_order)
+
+            #Placing OCO sell order with 5% profit -
+            market = exchange.market(coin_symbol)
+            amount = order_buy_order.get('amount')
+            price = order_buy_order.get('average') * 1.05
+            stop_price = order_buy_order.get('average') * 0.971
+            stop_limit_price = order_buy_order.get('average') * 0.97
+
+            response = exchange.private_post_order_oco({
+                'symbol': market['id'],
+                'side': 'SELL',  # SELL, BUY
+                'quantity': exchange.amount_to_precision(coin_symbol, amount),
+                'price': exchange.price_to_precision(coin_symbol, price),
+                'stopPrice': exchange.price_to_precision(coin_symbol, stop_price),
+                'stopLimitPrice': exchange.price_to_precision(coin_symbol, stop_limit_price),
+                # If provided, stopLimitTimeInForce is required
+                'stopLimitTimeInForce': 'GTC',  # GTC, FOK, IOC
+                # 'listClientOrderId': exchange.uuid(),  # A unique Id for the entire orderList
+                # 'limitClientOrderId': exchange.uuid(),  # A unique Id for the limit order
+                # 'limitIcebergQty': exchangea.amount_to_precision(symbol, limit_iceberg_quantity),
+                # 'stopClientOrderId': exchange.uuid()  # A unique Id for the stop loss/stop loss limit leg
+                # 'stopIcebergQty': exchange.amount_to_precision(symbol, stop_iceberg_quantity),
+                # 'newOrderRespType': 'ACK',  # ACK, RESULT, FULL
+            })
+            print(f' OCO resposne is  {response}')
+            # #Placing stop loss order -
+            # limit_price_sl = order_buy_order.get('average') *0.97
+            # stopPrice_sl = order_buy_order.get('average') *0.98 # If price fall below this , stop price a limit order to sell all the qyantities will be placed
+            # params = {'stopPrice': stopPrice_sl}
+            # order_stop_loss = exchange.create_order(coin_symbol, 'STOP_LOSS_LIMIT', 'sell', order_buy_order.get('amount'), limit_price_sl, params)
+            # print(f' Stop loss order is {order_stop_loss}')
+            # #Placing the take profit order
+            # limit_price_profit = order_buy_order.get('average') * 1.05
+            # #stopPrice_sl_profit = order_buy_order.get('average') * 1.05  # If price fall below this , stop price a limit order to sell all the qyantities will be placed
+            # print('Creating the take profit order============================')
+            # print(f'Creating the take profit order for {order_buy_order.get("amount")} quantities at price {limit_price_profit}')
+            # order_take_profit = exchange.create_limit_sell_order(coin_symbol, order_buy_order.get('amount'),
+            #                                                    limit_price_profit)
+
+
+            in_position= True
+        else :
+            print('Already in position , nothng to do')
+
+    #For Sell order if any of supertrend is in down trend we will sell the holdings
+    # if (not df['in_uptrend_st1'][last_row_index]) or (not df['in_uptrend_st2'][last_row_index]):
+    #     if in_position:
+    #         print('Change to downtrend : Sell ')
+    #         free_balance_to_Sell = calculate_free_coins_for_sell(coin_symbol,exchange)
+    #         order = exchange.create_market_sell_order(coin_symbol,free_balance_to_Sell )
+    #         print(order)
+    #         in_position = False
+    #     else:
+    #         print('You arent in position nothing to sell')
+
 
 #dynamic rounding for crypto
-
 def format_num_filter(number):
     if 5>number >= 1 :
         return round(number,1)

@@ -41,7 +41,8 @@ def run_bot(trade):
     #with_ema_55_day = helper.add_ema(with_super_trend_data,200)
     with_ema_55_day = helper.add_ema(with_super_trend_data_st2,config.ema_period)
 
-    helper.check_and_trigger_buy_sell_orders(with_ema_55_day,coin_symbol,exchange)
+    #helper.check_and_trigger_buy_sell_orders(with_ema_55_day,coin_symbol,exchange)
+    helper.check_and_trigger_buy_sell_orders_risk_reward(with_ema_55_day,coin_symbol,exchange)
 
 def trade_crypto():
     try:
