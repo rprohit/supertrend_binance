@@ -66,7 +66,7 @@ def trade_crypto():
 
 
 def start_bot():
-    schedule.every(150).seconds.do(trade_crypto)
+    schedule.every(2).seconds.do(trade_crypto)
     while True:
         schedule.run_pending()
         time.sleep(1)

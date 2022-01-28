@@ -206,8 +206,8 @@ def check_and_trigger_buy_sell_orders_risk_reward(df,coin_symbol,exchange):
             market = exchange.market(coin_symbol)
             amount = order_buy_order.get('amount')
             price = order_buy_order.get('average') * 1.05
-            stop_price = order_buy_order.get('average') * 0.971
-            stop_limit_price = order_buy_order.get('average') * 0.97
+            stop_price = order_buy_order.get('average') * 0.981
+            stop_limit_price = order_buy_order.get('average') * 0.98
 
             response = exchange.private_post_order_oco({
                 'symbol': market['id'],
